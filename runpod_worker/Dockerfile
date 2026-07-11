@@ -12,13 +12,16 @@ RUN git clone https://github.com/facefusion/facefusion.git
 
 WORKDIR /workspace/facefusion
 
-# Устанавливаем зависимости FaceFusion
-RUN python install.py --torch cuda --onnxruntime cuda
+# === НАДЕЖНАЯ УСТАНОВКА БЕЗ install.py ===
+# 1. Ставим все базовые зависимости из списка
+RUN pip install -r requirements.txt --no-cache-dir
+# 2. Принудительно ставим GPU-версию onnxruntime для работы нейросети на видеокарте
+RUN pip uninstall -y onnxruntime onnxruntime-gpu && pip install onnxruntime-gpu --no-cache-dir
 
 # ========================================================
 # ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ (NSFW FILTER BYPASS)
-# Мы дописываем в конец файла анализатора функции, которые 
-# перекрывают оригинальные и всегда разрешают обработку.
+# Дописываем функции-заглушки в конец файла анализатора, 
+# чтобы нейросеть всегда пропускала любой контент.
 RUN echo "\n\n# --- BYPASS NSFW ---" >> facefusion/content_analyser.py && \
     echo "def analyse_frame(*args, **kwargs): return False" >> facefusion/content_analyser.py && \
     echo "def analyse_image(*args, **kwargs): return False" >> facefusion/content_analyser.py && \
