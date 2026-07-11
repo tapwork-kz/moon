@@ -7,7 +7,7 @@ from supabase import create_client, Client
 
 # ================= НАСТРОЙКИ =================
 SUPABASE_URL = "https://erjvkdnmfuzdoytoxpol.supabase.co"
-SUPABASE_KEY = "ТВОЙ_SUPABASE_KEY" # Замени на свой
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVyanZrZG5tZnV6ZG95dG94cG9sIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzYwMjczMSwiZXhwIjoyMDk5MTc4NzMxfQ.d7Y-U8oY3JswgMFhq4GK027XY5XB80Kn9q2eTK8k68o" # Замени на свой
 BOT_TOKEN = "8091794183:AAFNRyezwqE8hHYm26YqFp5cTmQe6d8qRz8"
 # =============================================
 
