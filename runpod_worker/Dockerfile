@@ -26,11 +26,11 @@ WORKDIR /workspace/facefusion
 RUN python -m pip install -r requirements.txt --no-cache-dir
 
 # ========================================================
-# ИСПРАВЛЕНИЕ: Ставим onnxruntime-gpu строго для CUDA 11
+# ИСПРАВЛЕНИЕ: Жестко фиксируем стабильную версию onnxruntime-gpu
 # ========================================================
 RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu && \
-    python -m pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/ --no-cache-dir
-
+    python -m pip install onnxruntime-gpu==1.18.1 --no-cache-dir
+    
 # ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ (NSFW FILTER BYPASS)
 RUN echo "\n\n# --- BYPASS NSFW ---" >> facefusion/content_analyser.py && \
     echo "def analyse_frame(*args, **kwargs): return False" >> facefusion/content_analyser.py && \
