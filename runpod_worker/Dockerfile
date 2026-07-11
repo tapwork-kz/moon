@@ -1,24 +1,32 @@
-# Используем базовый образ RunPod с предустановленным PyTorch и CUDA
+# Используем надежный базовый образ с CUDA
 FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
 
-# ДОБАВЛЕНО: build-essential и python3-dev для компиляции тяжелых библиотек
-RUN apt-get update && apt-get install -y ffmpeg git nano build-essential python3-dev && rm -rf /var/lib/apt/lists/*
+# 1. Устанавливаем системные пакеты и репозиторий для свежего Python
+RUN apt-get update && apt-get install -y software-properties-common curl ffmpeg git nano build-essential && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && \
+    apt-get install -y python3.11 python3.11-dev python3.11-distutils && \
+    rm -rf /var/lib/apt/lists/*
+
+# 2. Делаем Python 3.11 версией по умолчанию в системе
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# 3. Устанавливаем свежий pip специально для Python 3.11
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
 WORKDIR /workspace
 
-# Клонируем официальный FaceFusion
+# Клонируем FaceFusion
 RUN git clone https://github.com/facefusion/facefusion.git
 
 WORKDIR /workspace/facefusion
 
-# ДОБАВЛЕНО: Обновляем базовые инструменты Python перед установкой пакетов
-RUN pip install --upgrade pip setuptools wheel
-
-# Устанавливаем зависимости
-RUN pip install -r requirements.txt --no-cache-dir
+# 4. Устанавливаем все пакеты (теперь они без проблем найдутся для версии 3.11)
+RUN python -m pip install -r requirements.txt --no-cache-dir
 
 # Принудительно ставим GPU-версию onnxruntime
-RUN pip uninstall -y onnxruntime onnxruntime-gpu && pip install onnxruntime-gpu --no-cache-dir
+RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu && python -m pip install onnxruntime-gpu --no-cache-dir
 
 # ========================================================
 # ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ (NSFW FILTER BYPASS)
@@ -28,8 +36,8 @@ RUN echo "\n\n# --- BYPASS NSFW ---" >> facefusion/content_analyser.py && \
     echo "def analyse_video(*args, **kwargs): return False" >> facefusion/content_analyser.py
 # ========================================================
 
-# Устанавливаем библиотеки для нашего воркера
-RUN pip install runpod supabase requests
+# Устанавливаем библиотеки для нашего Serverless-воркера
+RUN python -m pip install runpod supabase requests
 
 # Копируем наш бессерверный скрипт внутрь образа
 COPY serverless_worker.py /workspace/serverless_worker.py
