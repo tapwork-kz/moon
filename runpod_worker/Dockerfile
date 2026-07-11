@@ -30,9 +30,12 @@ RUN python -m pip install -r requirements.txt --no-cache-dir
 # ========================================================
 RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu && \
     python -m pip install onnxruntime-gpu==1.18.1 --no-cache-dir
-    
-# ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ (NSFW FILTER BYPASS)
-RUN echo "\n\n# --- BYPASS NSFW ---" >> facefusion/content_analyser.py && \
+
+# ========================================================
+# ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ (NSFW FILTER BYPASS) - ИСПРАВЛЕНО
+# ========================================================
+RUN echo "" >> facefusion/content_analyser.py && \
+    echo "# --- BYPASS NSFW ---" >> facefusion/content_analyser.py && \
     echo "def analyse_frame(*args, **kwargs): return False" >> facefusion/content_analyser.py && \
     echo "def analyse_image(*args, **kwargs): return False" >> facefusion/content_analyser.py && \
     echo "def analyse_video(*args, **kwargs): return False" >> facefusion/content_analyser.py
