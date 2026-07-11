@@ -1,4 +1,4 @@
-# Используем надежный базовый образ с CUDA
+# Используем надежный базовый образ с CUDA 11.8
 FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
 
 # 1. Устанавливаем системные пакеты и репозиторий для свежего Python
@@ -22,19 +22,20 @@ RUN git clone https://github.com/facefusion/facefusion.git
 
 WORKDIR /workspace/facefusion
 
-# 4. Устанавливаем все пакеты (теперь они без проблем найдутся для версии 3.11)
+# 4. Устанавливаем все пакеты
 RUN python -m pip install -r requirements.txt --no-cache-dir
 
-# Принудительно ставим GPU-версию onnxruntime
-RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu && python -m pip install onnxruntime-gpu --no-cache-dir
-
 # ========================================================
+# ИСПРАВЛЕНИЕ: Ставим onnxruntime-gpu строго для CUDA 11
+# ========================================================
+RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu && \
+    python -m pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-11/pypi/simple/ --no-cache-dir
+
 # ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ (NSFW FILTER BYPASS)
 RUN echo "\n\n# --- BYPASS NSFW ---" >> facefusion/content_analyser.py && \
     echo "def analyse_frame(*args, **kwargs): return False" >> facefusion/content_analyser.py && \
     echo "def analyse_image(*args, **kwargs): return False" >> facefusion/content_analyser.py && \
     echo "def analyse_video(*args, **kwargs): return False" >> facefusion/content_analyser.py
-# ========================================================
 
 # Устанавливаем библиотеки для нашего Serverless-воркера
 RUN python -m pip install runpod supabase requests

@@ -5,7 +5,7 @@ from app.config import settings
 
 class StorageService:
     def __init__(self):
-        self.supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        self.supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 
     async def upload_file(self, bucket_name: str, file_path: str, file_bytes: bytes, content_type: str) -> str:
         """Загружает файл в указанный бакет и возвращает публичную ссылку"""

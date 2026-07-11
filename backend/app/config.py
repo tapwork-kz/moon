@@ -1,11 +1,13 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    SUPABASE_URL: str
-    SUPABASE_KEY: str
-    BOT_TOKEN: str
-    REDIS_URL: str
+    supabase_url: str
+    supabase_key: str
+    bot_token: str
+    runpod_endpoint_id: str
+    runpod_api_key: str
     
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    class Config:
+        env_file = ".env"
 
 settings = Settings()

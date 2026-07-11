@@ -1,7 +1,7 @@
-from app.config import settings
 from supabase import create_client, Client
+from app.config import settings
 
-supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 
 def get_or_create_user(telegram_id: int, username: str | None = None):
     # Ищем пользователя
