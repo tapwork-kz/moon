@@ -5,47 +5,49 @@ import uuid
 import runpod
 from supabase import create_client, Client
 
-# ================= НАСТРОЙКИ =================
-# БЕРЕМ КЛЮЧИ ИЗ ОБЛАКА RUNPOD, А НЕ ИЗ ФАЙЛА!
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-# =============================================
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 TEMP_DIR = "/workspace/temp_jobs"
 os.makedirs(TEMP_DIR, exist_ok=True)
 FF_DIR = "/workspace/facefusion"
 
-def upload_file_sync(bucket_name: str, file_path: str, file_bytes: bytes, content_type: str) -> str:
-    supabase.storage.from_(bucket_name).upload(
-        path=file_path, file=file_bytes, file_options={"content-type": content_type, "x-upsert": "true"}
-    )
-    return supabase.storage.from_(bucket_name).get_public_url(file_path)
-
 def process_job(job):
-    job_input = job['input']
-    job_id = job['id']
+    job_input = job.get('input', {})
+    job_id = job.get('id', 'unknown')
     
-    video_url = job_input['video_url']
-    face_url = job_input['face_url']
-    user_id = job_input['user_id']
-    telegram_id = job_input['telegram_id']
+    # 1. Получаем переменные окружения прямо в момент запуска задачи
+    SUPABASE_URL = os.environ.get("SUPABASE_URL")
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+    BOT_TOKEN = os.environ.get("BOT_TOKEN")
+    
+    video_url = job_input.get('video_url')
+    face_url = job_input.get('face_url')
+    user_id = job_input.get('user_id')
+    telegram_id = job_input.get('telegram_id')
 
     print(f"[{job_id}] 🚀 RunPod Serverless начал обработку!")
     
+    # Проверка ключей
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        error_msg = "❌ ОШИБКА: Ключи Supabase не найдены в настройках RunPod (Environment Variables)!"
+        print(error_msg)
+        return {"status": "error", "error_message": error_msg}
+
+    # Инициализируем Supabase безопасно
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
     local_video_path = os.path.join(TEMP_DIR, f"{job_id}_video.mp4")
     local_face_path = os.path.join(TEMP_DIR, f"{job_id}_face.jpg")
     local_result_path = os.path.join(TEMP_DIR, f"{job_id}_result.mp4")
 
     try:
-        # 1. Скачиваем файлы
+        # 2. Скачиваем файлы
+        print(f"[{job_id}] 📥 Скачивание файлов...")
         with open(local_video_path, 'wb') as f:
             f.write(requests.get(video_url).content)
         with open(local_face_path, 'wb') as f:
             f.write(requests.get(face_url).content)
 
-        # 2. Запуск FaceFusion
+        # 3. Запуск FaceFusion
+        print(f"[{job_id}] ⚙️ Запуск FaceFusion...")
         command = [
             "python", "facefusion.py", "headless-run", 
             "-s", local_face_path, 
@@ -54,26 +56,33 @@ def process_job(job):
             "--execution-providers", "cuda"
         ]
         
-        # ВАЖНО: Захватываем внутренние логи FaceFusion!
+        # Захватываем логи напрямую из консоли FaceFusion
         process = subprocess.run(command, cwd=FF_DIR, capture_output=True, text=True)
         
-        # Если FaceFusion упал, вызываем ошибку и прикрепляем то, что он написал в консоли
         if process.returncode != 0:
-            raise Exception(f"ОШИБКА FACEFUSION:\n{process.stderr}\n{process.stdout}")
+            error_msg = f"ОШИБКА FACEFUSION:\nSTDERR: {process.stderr}\nSTDOUT: {process.stdout}"
+            print(error_msg)
+            raise Exception(error_msg)
 
-        # 3. Выгрузка в Supabase
+        # 4. Выгрузка в Supabase
+        print(f"[{job_id}] ☁️ Загрузка результата в облако...")
         with open(local_result_path, "rb") as f:
             result_bytes = f.read()
         
         result_cloud_path = f"{user_id}/{uuid.uuid4()}_result.mp4"
-        result_url = upload_file_sync("videos-output", result_cloud_path, result_bytes, "video/mp4")
+        supabase.storage.from_("videos-output").upload(
+            path=result_cloud_path, file=result_bytes, file_options={"content-type": "video/mp4", "x-upsert": "true"}
+        )
+        result_url = supabase.storage.from_("videos-output").get_public_url(result_cloud_path)
 
-        # 4. Отправка в Telegram
-        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo", data={
-            "chat_id": telegram_id,
-            "video": result_url,
-            "caption": "✨ Готово! Нейросеть успешно обработала видео."
-        })
+        # 5. Отправка в Telegram
+        print(f"[{job_id}] ✉️ Отправка в Telegram...")
+        if BOT_TOKEN:
+            requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo", data={
+                "chat_id": telegram_id,
+                "video": result_url,
+                "caption": "✨ Готово! Нейросеть успешно обработала видео."
+            })
 
         # Очистка
         os.remove(local_video_path)
@@ -83,7 +92,7 @@ def process_job(job):
         return {"status": "success", "result_url": result_url}
 
     except Exception as e:
-        print(f"[{job_id}] ❌ {e}")
+        print(f"[{job_id}] ❌ Ошибка выполнения: {e}")
         if BOT_TOKEN and telegram_id:
             requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data={
                 "chat_id": telegram_id,
