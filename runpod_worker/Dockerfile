@@ -12,8 +12,15 @@ RUN git clone https://github.com/facefusion/facefusion.git
 
 WORKDIR /workspace/facefusion
 
-# 4. Устанавливаем зависимости ИДЕАЛЬНО ЧИСТО (они автоматически подхватят CUDA 12.4)
+# 4. Устанавливаем зависимости
 RUN pip install -r requirements.txt --no-cache-dir
+
+# ========================================================
+# МАГИЯ: Включаем поддержку GPU для CUDA 12!
+# Удаляем обычный ONNX и ставим правильный onnxruntime-gpu
+# ========================================================
+RUN pip uninstall -y onnxruntime onnxruntime-gpu && \
+    pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ --no-cache-dir
 
 # 5. ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ
 RUN echo "" >> facefusion/content_analyser.py && \
