@@ -13,7 +13,6 @@ def process_job(job):
     job_input = job.get('input', {})
     job_id = job.get('id', 'unknown')
     
-    # 1. Получаем переменные окружения прямо в момент запуска задачи
     SUPABASE_URL = os.environ.get("SUPABASE_URL")
     SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -25,13 +24,9 @@ def process_job(job):
 
     print(f"[{job_id}] 🚀 RunPod Serverless начал обработку!")
     
-    # Проверка ключей
     if not SUPABASE_URL or not SUPABASE_KEY:
-        error_msg = "❌ ОШИБКА: Ключи Supabase не найдены в настройках RunPod (Environment Variables)!"
-        print(error_msg)
-        return {"status": "error", "error_message": error_msg}
+        return {"status": "error", "error_message": "Ключи Supabase не найдены!"}
 
-    # Инициализируем Supabase безопасно
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
     local_video_path = os.path.join(TEMP_DIR, f"{job_id}_video.mp4")
@@ -39,32 +34,42 @@ def process_job(job):
     local_result_path = os.path.join(TEMP_DIR, f"{job_id}_result.mp4")
 
     try:
-        # 2. Скачиваем файлы
+        # --- ДИАГНОСТИКА СКАЧИВАНИЯ ---
         print(f"[{job_id}] 📥 Скачивание файлов...")
+        req_video = requests.get(video_url)
         with open(local_video_path, 'wb') as f:
-            f.write(requests.get(video_url).content)
+            f.write(req_video.content)
+            
+        req_face = requests.get(face_url)
         with open(local_face_path, 'wb') as f:
-            f.write(requests.get(face_url).content)
+            f.write(req_face.content)
 
-        # 3. Запуск FaceFusion
+        video_size = os.path.getsize(local_video_path)
+        face_size = os.path.getsize(local_face_path)
+        
+        print(f"[{job_id}] 📦 Размер видео: {video_size} байт. HTTP статус: {req_video.status_code}")
+        print(f"[{job_id}] 📦 Размер фото: {face_size} байт. HTTP статус: {req_face.status_code}")
+        
+        if video_size < 1000 or face_size < 1000:
+            raise Exception(f"Файлы битые или слишком маленькие! Ответ сервера: {req_video.text[:200]}")
+
+        # --- ЗАПУСК FACEFUSION В РЕЖИМЕ ОТЛАДКИ ---
         print(f"[{job_id}] ⚙️ Запуск FaceFusion...")
         command = [
             "python", "facefusion.py", "headless-run", 
             "-s", local_face_path, 
             "-t", local_video_path, 
             "-o", local_result_path, 
-            "--execution-providers", "cuda"
+            "--execution-providers", "cuda",
+            "--log-level", "debug"  # ЭТОТ ФЛАГ РАССКАЖЕТ НАМ ВСЁ
         ]
         
-        # Захватываем логи напрямую из консоли FaceFusion
         process = subprocess.run(command, cwd=FF_DIR, capture_output=True, text=True)
         
         if process.returncode != 0:
-            error_msg = f"ОШИБКА FACEFUSION:\nSTDERR: {process.stderr}\nSTDOUT: {process.stdout}"
-            print(error_msg)
-            raise Exception(error_msg)
+            raise Exception(f"ОШИБКА FACEFUSION:\nSTDERR: {process.stderr}\nSTDOUT: {process.stdout}")
 
-        # 4. Выгрузка в Supabase
+        # --- ВЫГРУЗКА ---
         print(f"[{job_id}] ☁️ Загрузка результата в облако...")
         with open(local_result_path, "rb") as f:
             result_bytes = f.read()
@@ -75,7 +80,6 @@ def process_job(job):
         )
         result_url = supabase.storage.from_("videos-output").get_public_url(result_cloud_path)
 
-        # 5. Отправка в Telegram
         print(f"[{job_id}] ✉️ Отправка в Telegram...")
         if BOT_TOKEN:
             requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo", data={
@@ -84,7 +88,6 @@ def process_job(job):
                 "caption": "✨ Готово! Нейросеть успешно обработала видео."
             })
 
-        # Очистка
         os.remove(local_video_path)
         os.remove(local_face_path)
         os.remove(local_result_path)
