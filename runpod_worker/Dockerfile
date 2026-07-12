@@ -8,12 +8,15 @@ RUN apt-get update && apt-get install -y ffmpeg git curl build-essential && \
 WORKDIR /workspace
 
 # ========================================================
-# ГЛАВНЫЙ ФИКС: Замораживаем стабильную версию FaceFusion!
-# Больше никаких сюрпризов от разработчиков
+# ГЛАВНЫЙ ФИКС: Скачиваем репозиторий и откатываемся
+# на стабильную версию 2.6.1 с помощью тега
 # ========================================================
-RUN git clone --branch 2.3.0 https://github.com/facefusion/facefusion.git
+RUN git clone https://github.com/facefusion/facefusion.git
 
 WORKDIR /workspace/facefusion
+
+# Жестко переключаемся на нужную версию
+RUN git checkout 2.6.1
 
 # 3. Ставим родные зависимости именно для этой версии
 RUN pip install -r requirements.txt --no-cache-dir
