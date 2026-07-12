@@ -60,8 +60,8 @@ def process_job(job):
             "-s", local_face_path, 
             "-t", local_video_path, 
             "-o", local_result_path, 
-            "--execution-providers", "cuda",
-            "--log-level", "debug"  # ЭТОТ ФЛАГ РАССКАЖЕТ НАМ ВСЁ
+            "--execution-providers", "cpu", # <--- ИЗМЕНИЛИ ЗДЕСЬ
+            "--log-level", "debug"
         ]
         
         process = subprocess.run(command, cwd=FF_DIR, capture_output=True, text=True)
