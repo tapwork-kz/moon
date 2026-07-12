@@ -53,18 +53,22 @@ def process_job(job):
         if video_size < 1000 or face_size < 1000:
             raise Exception(f"Файлы битые или слишком маленькие! Ответ сервера: {req_video.text[:200]}")
 
-        # --- ЗАПУСК FACEFUSION В РЕЖИМЕ ОТЛАДКИ ---
+        # --- ЗАПУСК FACEFUSION ---
         print(f"[{job_id}] ⚙️ Запуск FaceFusion...")
         command = [
             "python", "facefusion.py", "headless-run", 
             "-s", local_face_path, 
             "-t", local_video_path, 
             "-o", local_result_path, 
-            "--execution-providers", "cpu", # <--- ИЗМЕНИЛИ ЗДЕСЬ
+            "--execution-providers", "cuda", # <--- ВЕРНУЛИ НА МЕСТО ВИДЕОКАРТУ
             "--log-level", "debug"
         ]
         
-        process = subprocess.run(command, cwd=FF_DIR, capture_output=True, text=True)
+        # Добавляем хардкорный перехват системных падений
+        custom_env = os.environ.copy()
+        custom_env["PYTHONFAULTHANDLER"] = "1"
+        
+        process = subprocess.run(command, cwd=FF_DIR, capture_output=True, text=True, env=custom_env)
         
         if process.returncode != 0:
             raise Exception(f"ОШИБКА FACEFUSION:\nSTDERR: {process.stderr}\nSTDOUT: {process.stdout}")
