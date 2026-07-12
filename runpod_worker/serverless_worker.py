@@ -1,8 +1,16 @@
 import os
+import sys
 import subprocess
 import requests
 import uuid
-import runpod
+
+# Проверка импорта runpod
+try:
+    import runpod
+except ImportError as e:
+    print(f"FATAL: runpod not installed: {e}", flush=True)
+    sys.exit(1)
+
 from supabase import create_client, Client
 
 TEMP_DIR = "/workspace/temp_jobs"
@@ -98,4 +106,4 @@ def process_job(job):
         return {"status": "error", "error_message": str(e)}
 
 if __name__ == "__main__":
-    runpod.serverless.start({"handler": process_job})
+    runpod.serverless.start(handler=process_job)
