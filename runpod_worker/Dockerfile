@@ -1,4 +1,4 @@
-# Возвращаем проверенный рабочий образ
+# Использованием проверенный базовый образ с CUDA 11.8
 FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
 
 # 1. Устанавливаем системные пакеты
@@ -26,11 +26,10 @@ WORKDIR /workspace/facefusion
 RUN python -m pip install -r requirements.txt --no-cache-dir
 
 # ========================================================
-# РЕШЕНИЕ ПРОБЛЕМЫ: Ставим стабильную версию 1.17.1
-# Она идеально совместима с CUDA 11.8 без хитрых ссылок
+# ИСПРАВЛЕНИЕ КОНФЛИКТА ВЕРСИЙ: Фиксируем onnxruntime и numpy
 # ========================================================
-RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu && \
-    python -m pip install onnxruntime-gpu==1.17.1 --no-cache-dir
+RUN python -m pip uninstall -y onnxruntime onnxruntime-gpu numpy && \
+    python -m pip install onnxruntime-gpu==1.17.1 numpy==1.26.4 --no-cache-dir
 
 # ========================================================
 # ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ (NSFW FILTER BYPASS)
