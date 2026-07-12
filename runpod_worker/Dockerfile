@@ -1,7 +1,7 @@
 # 1. Используем новейший официальный образ RunPod (Python 3.11 + CUDA 12.4)
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
-# 2. Устанавливаем ffmpeg (нужен для работы с видео)
+# 2. Устанавливаем ffmpeg и необходимые инструменты
 RUN apt-get update && apt-get install -y ffmpeg git curl build-essential && \
     rm -rf /var/lib/apt/lists/*
 
@@ -15,12 +15,9 @@ WORKDIR /workspace/facefusion
 # 4. Устанавливаем зависимости
 RUN pip install -r requirements.txt --no-cache-dir
 
-# ========================================================
-# МАГИЯ: Включаем поддержку GPU для CUDA 12!
-# Удаляем обычный ONNX и ставим правильный onnxruntime-gpu
-# ========================================================
-RUN pip uninstall -y onnxruntime onnxruntime-gpu && \
-    pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ --no-cache-dir
+# === ЛЕЧЕНИЕ: замена onnxruntime на GPU-версию ===
+RUN pip uninstall -y onnxruntime && \
+    pip install --no-cache-dir onnxruntime-gpu
 
 # 5. ОТКЛЮЧЕНИЕ ЦЕНЗУРЫ
 RUN echo "" >> facefusion/content_analyser.py && \
