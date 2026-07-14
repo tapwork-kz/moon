@@ -1,18 +1,11 @@
 import os
-import sys
 import subprocess
 import requests
 import uuid
-
-# Проверка импорта runpod
-try:
-    import runpod
-except ImportError as e:
-    print(f"FATAL: runpod not installed: {e}", flush=True)
-    sys.exit(1)
-
+import runpod
 from supabase import create_client, Client
 
+# Папки для временных файлов
 TEMP_DIR = "/workspace/temp_jobs"
 os.makedirs(TEMP_DIR, exist_ok=True)
 FF_DIR = "/workspace/facefusion"
@@ -21,6 +14,7 @@ def process_job(job):
     job_input = job.get('input', {})
     job_id = job.get('id', 'unknown')
     
+    # Получаем секретные ключи из настроек RunPod
     SUPABASE_URL = os.environ.get("SUPABASE_URL")
     SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -33,7 +27,7 @@ def process_job(job):
     print(f"[{job_id}] 🚀 RunPod Serverless начал обработку!", flush=True)
     
     if not SUPABASE_URL or not SUPABASE_KEY:
-        return {"status": "error", "error_message": "Ключи Supabase не найдены!"}
+        return {"status": "error", "error_message": "Ключи Supabase не найдены в Environment Variables!"}
 
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -42,6 +36,7 @@ def process_job(job):
     local_result_path = os.path.join(TEMP_DIR, f"{job_id}_result.mp4")
 
     try:
+        # --- 1. СКАЧИВАНИЕ ФАЙЛОВ ---
         print(f"[{job_id}] 📥 Скачивание файлов...", flush=True)
         req_video = requests.get(video_url)
         with open(local_video_path, 'wb') as f:
@@ -54,9 +49,13 @@ def process_job(job):
         video_size = os.path.getsize(local_video_path)
         face_size = os.path.getsize(local_face_path)
         
-        print(f"[{job_id}] 📦 Размер видео: {video_size} байт. HTTP: {req_video.status_code}", flush=True)
-        print(f"[{job_id}] 📦 Размер фото: {face_size} байт. HTTP: {req_face.status_code}", flush=True)
+        print(f"[{job_id}] 📦 Размер видео: {video_size} байт. HTTP статус: {req_video.status_code}", flush=True)
+        print(f"[{job_id}] 📦 Размер фото: {face_size} байт. HTTP статус: {req_face.status_code}", flush=True)
+        
+        if video_size < 1000 or face_size < 1000:
+            raise Exception(f"Файлы битые или слишком маленькие! Ответ сервера: {req_video.text[:200]}")
 
+        # --- 2. ЗАПУСК FACEFUSION ---
         print(f"[{job_id}] ⚙️ Запуск FaceFusion (CUDA)...", flush=True)
         command = [
             "python", "facefusion.py", "headless-run", 
@@ -67,11 +66,16 @@ def process_job(job):
             "--log-level", "debug"
         ]
         
-        process = subprocess.run(command, cwd=FF_DIR, capture_output=True, text=True)
+        # Захватываем системные краши (Segmentation Fault)
+        custom_env = os.environ.copy()
+        custom_env["PYTHONFAULTHANDLER"] = "1"
+        
+        process = subprocess.run(command, cwd=FF_DIR, capture_output=True, text=True, env=custom_env)
         
         if process.returncode != 0:
             raise Exception(f"ОШИБКА FACEFUSION:\nSTDERR: {process.stderr}\nSTDOUT: {process.stdout}")
 
+        # --- 3. ВЫГРУЗКА В SUPABASE ---
         print(f"[{job_id}] ☁️ Загрузка результата в облако...", flush=True)
         with open(local_result_path, "rb") as f:
             result_bytes = f.read()
@@ -82,6 +86,7 @@ def process_job(job):
         )
         result_url = supabase.storage.from_("videos-output").get_public_url(result_cloud_path)
 
+        # --- 4. ОТПРАВКА В TELEGRAM ---
         print(f"[{job_id}] ✉️ Отправка в Telegram...", flush=True)
         if BOT_TOKEN:
             requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendVideo", data={
@@ -90,6 +95,7 @@ def process_job(job):
                 "caption": "✨ Готово! Нейросеть успешно обработала видео."
             })
 
+        # --- ОЧИСТКА ---
         os.remove(local_video_path)
         os.remove(local_face_path)
         os.remove(local_result_path)
@@ -106,4 +112,4 @@ def process_job(job):
         return {"status": "error", "error_message": str(e)}
 
 if __name__ == "__main__":
-    runpod.serverless.start(handler=process_job)
+    runpod.serverless.start({"handler": process_job})
