@@ -28,8 +28,22 @@ def process_face_swap(job_id: str, video_id: str, face_id: str):
             }
         }
         
+        # --- ПРОСЛУШКА ДЛЯ ОТЛАДКИ ---
+        print(f"\n[{job_id}] --- ОТПРАВКА В RUNPOD ---")
+        print(f"URL: {url}")
+        api_key_preview = str(settings.runpod_api_key)[:5] if settings.runpod_api_key else "None"
+        print(f"API Ключ начинается на: {api_key_preview}***")
+        
         # 3. Отправляем команду на запуск видеокарты
         response = requests.post(url, json=payload, headers=headers)
+        
+        print(f"[{job_id}] HTTP Статус от RunPod: {response.status_code}")
+        print(f"[{job_id}] Сырой ответ от RunPod: {response.text}")
+        print(f"-------------------------\n")
+        
+        # Если RunPod вернул ошибку (например, 401 или 404), код прервется и перейдет в блок except
+        response.raise_for_status() 
+        
         response_data = response.json()
         
         print(f"[{job_id}] ✅ Сигнал передан в RunPod! ID задачи в облаке: {response_data.get('id')}")
@@ -39,6 +53,10 @@ def process_face_swap(job_id: str, video_id: str, face_id: str):
         
         return {"status": "success", "runpod_id": response_data.get("id")}
         
+    except requests.exceptions.HTTPError as http_err:
+        print(f"[{job_id}] ❌ Ошибка HTTP от RunPod: {http_err}")
+        supabase.table("jobs").update({"gpu_status": "failed"}).eq("id", job_id).execute()
+        return {"status": "error", "error": str(http_err)}
     except Exception as e:
         print(f"[{job_id}] ❌ Ошибка при отправке в RunPod: {e}")
         supabase.table("jobs").update({"gpu_status": "failed"}).eq("id", job_id).execute()

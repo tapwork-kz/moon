@@ -63,6 +63,8 @@ def process_job(job):
             "-t", local_video_path, 
             "-o", local_result_path, 
             "--execution-providers", "cuda",
+            "--video-memory-strategy", "strict",   # <--- СПАСАЕТ ОТ OOM KILLER
+            "--execution-thread-count", "1",       # <--- ДЕЛАЕТ РЕНДЕР СТАБИЛЬНЫМ
             "--log-level", "debug"
         ]
         
