@@ -22,7 +22,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./runpod_worker
+          context: ./facefusion-serverless
           push: true
           # ВАЖНО: Замени "твой_логин" на свой username в Docker Hub!
           tags: baitas/face-swap-worker:latest
