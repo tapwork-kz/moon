@@ -1,0 +1,9 @@
+{
+  "input": {
+    "job_id": "test_123",
+    "user_id": "user_456",
+    "source_file_url": "https://example.com/test_video.mp4",
+    "face_file_url": "https://example.com/test_face.jpg",
+    "output_format": "mp4"
+  }
+}
