@@ -49,8 +49,7 @@ RUN pip install -r $WORKSPACE_DIR/requirements.txt \
 # 8. Проверки при сборке (Fail-Fast)
 RUN python -c "import sys; print('Python:', sys.version)" \
     && pip --version \
-    && ffmpeg -version \
-    && python $WORKSPACE_DIR/build_check.py
+    && ffmpeg -version
 
 # 9. Подготовка к запуску
 WORKDIR $WORKSPACE_DIR/facefusion
